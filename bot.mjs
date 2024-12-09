@@ -311,7 +311,7 @@ client.on('messageCreate', async (message) => {
       if (memberFolders.length > 0) {
         let folderList = 'Please select your folder by replying with your name:\n';
         memberFolders.forEach((folder) => {
-          folderList += `${folder.name} (ID: ${folder.id})\n`;
+          folderList += `${folder.name} \n`;
         });
 
         message.reply(folderList);
