@@ -334,12 +334,12 @@ client.on('messageCreate', async (message) => {
             fileStream.on('finish', async () => {
               try {
                 await uploadFileToGoogleDrive(filePath, file.name, selectedFolder.id);
-<<<<<<< HEAD
+
                 // message.reply(`Your task has been submitted successfully, <@${message.author.id}>!`);
                 await message.author.send(`Your task has been submitted successfully, <@${message.author.id}>!`);
-=======
-                message.reply(`Your task has been submitted successfully, <@${message.author.id}>!`);
->>>>>>> 26686b01d29793c7b6464f53caf6443fa100da99
+
+                
+
               } catch (error) {
                 console.error('Error uploading file to Google Drive:', error);
                 message.reply('Failed to submit your task. Please try again.');
