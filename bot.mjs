@@ -53,6 +53,23 @@ async function getTasksFolderId(auth) {
     throw new Error('Tasks folder not found in Google Drive.');
   }
 }
+async function getTaskFolderId(auth) {
+  const drive = google.drive({ version: 'v3', auth });
+  const res = await drive.files.list({
+    q: "name = 'Task' and mimeType = 'application/vnd.google-apps.folder'",
+    fields: 'files(id, name)',
+  });
+
+  console.log('Drive API Response:', res.data.files); // Log the response to see if any folder is returned
+
+  if (res.data.files.length > 0) {
+    console.log('Found folder:', res.data.files[0].name); // Log the found folder's name
+    return res.data.files[0].id;  // Return the ID of the 'Tasks' folder
+  } else {
+    console.error('Error: Task folder not found in Google Drive.');
+    throw new Error('Task folder not found in Google Drive.');
+  }
+}
 
 // Function to list member folders inside 'Tasks'
 async function listMemberFolders(auth, tasksFolderId) {
@@ -151,6 +168,130 @@ app.listen(port, () => {
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
+  
+  // Define the user ID who is allowed to use the "!all" command
+  const allowedUserId = '976003257237372949'; // Replace 'YOUR_USER_ID' with the Discord ID of the user
+  
+  // Define the channel ID where the "!all" command is allowed
+  // Replace 'YOUR_CHANNEL_ID' with the ID of the specific channel
+  
+  if (message.content === '!all') {
+    // Check if the message author is the allowed user
+    if (message.author.id !== allowedUserId) {
+      return message.reply("You don't have permission to use this command.");
+    }
+    
+    
+    
+    try {
+      
+      // Send the message in the channel where the command was used
+       await message.channel.send('@everyone New task has been added!');
+      
+      
+      
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      message.reply('Failed to send the notification. Please try again.');
+    }
+  }
+  
+  //-----------------------------------------------------------------------------------
+
+  if (message.content === '!task') {
+    try {
+      const auth = await authenticateGoogle();
+      const tasksFolderId = await getTaskFolderId(auth);
+
+      // List files in the "Tasks" folder
+      const drive = google.drive({ version: 'v3', auth });
+      const res = await drive.files.list({
+        q: `'${tasksFolderId}' in parents`,
+        fields: 'files(id, name, mimeType)',
+      });
+
+      const files = res.data.files;
+
+      if (!files || files.length === 0) {
+        return message.reply('No files found in the "Tasks" folder.');
+      }
+
+      const file = files[0]; // Select the first file
+      const filePath = path.join(__dirname, file.name);
+      const dest = fs.createWriteStream(filePath);
+
+      if (file.mimeType === 'application/pdf') {
+        // Directly download PDF files using media download
+        const response = await drive.files.get(
+          { fileId: file.id, alt: 'media' },
+          { responseType: 'stream' }
+        );
+
+        response.data.pipe(dest);
+
+        dest.on('finish', async () => {
+          try {
+            await message.author.send({
+              files: [filePath],
+            });
+            message.reply('Task file sent to your DM!');
+          } catch (error) {
+            console.error('Error sending file:', error);
+            message.reply('Failed to send the task. Please make sure your DMs are open.');
+          } finally {
+            fs.unlinkSync(filePath);  // Clean up the downloaded file
+          }
+        });
+
+        dest.on('error', (error) => {
+          console.error('Error writing file:', error);
+          message.reply('Failed to download the task. Please try again later.');
+        });
+      } else if (file.mimeType.includes('application/vnd.google-apps')) {
+        // For Google Docs, Sheets, etc. (export to PDF or DOCX)
+        let exportMimeType = 'application/pdf'; // Default to PDF
+        if (file.mimeType === 'application/vnd.google-apps.document') {
+          exportMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'; // DOCX
+        } else if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
+          exportMimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'; // XLSX
+        }
+
+        const response = await drive.files.export(
+          { fileId: file.id, mimeType: exportMimeType },
+          { responseType: 'stream' }
+        );
+
+        response.data.pipe(dest);
+
+        dest.on('finish', async () => {
+          try {
+            await message.author.send({
+              files: [filePath],
+            });
+            message.reply('Task file sent to your DM!');
+          } catch (error) {
+            console.error('Error sending file:', error);
+            message.reply('Failed to send the task. Please make sure your DMs are open.');
+          } finally {
+            fs.unlinkSync(filePath);
+          }
+        });
+
+        dest.on('error', (error) => {
+          console.error('Error writing file:', error);
+          message.reply('Failed to download the task. Please try again later.');
+        });
+      } else {
+        message.reply('Unsupported file type in the "Tasks" folder.');
+      }
+    } catch (error) {
+      console.error('Error handling !task command:', error);
+      message.reply('An error occurred while processing your request.');
+    }
+  }
+  //-----------------------------------------------------------------------------------
+
+  
 
   if (message.content.startsWith('!submit')) {
     const file = message.attachments.first();
@@ -193,7 +334,12 @@ client.on('messageCreate', async (message) => {
             fileStream.on('finish', async () => {
               try {
                 await uploadFileToGoogleDrive(filePath, file.name, selectedFolder.id);
+<<<<<<< HEAD
+                // message.reply(`Your task has been submitted successfully, <@${message.author.id}>!`);
+                await message.author.send(`Your task has been submitted successfully, <@${message.author.id}>!`);
+=======
                 message.reply(`Your task has been submitted successfully, <@${message.author.id}>!`);
+>>>>>>> 26686b01d29793c7b6464f53caf6443fa100da99
               } catch (error) {
                 console.error('Error uploading file to Google Drive:', error);
                 message.reply('Failed to submit your task. Please try again.');
@@ -214,10 +360,32 @@ client.on('messageCreate', async (message) => {
       message.reply('Please attach a file with your task.');
     }
   }
+
+  if (message.content === '!delete_all' && message.author.dmChannel) {
+    try {
+      const dmChannel = message.author.dmChannel;
+      // Fetch all messages in the DM channel
+      const messages = await dmChannel.messages.fetch();
+
+      // Loop through all messages and delete the ones sent by the bot
+      messages.forEach(async (msg) => {
+        if (msg.author.id === client.user.id) {
+          await msg.delete(); // Deletes the bot's messages
+        }
+      });
+
+      message.reply("All task confirmation messages have been deleted.");
+    } catch (error) {
+      console.error('Error deleting messages:', error);
+      message.reply("An error occurred while trying to delete the messages.");
+    }
+  }
 });
 
 
 
 // Log in the Discord bot
 client.login(process.env.BOT_TOKEN);
+
+
 
