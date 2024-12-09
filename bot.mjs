@@ -291,9 +291,9 @@ app.get('/auth/google/callback', async (req, res) => {
 
 // Start the Express server
 app.listen(port, () => {
-  console.log(`Server started at http://localhost:${port}`);
+  console.log(`Server started at http://bot-production-7bb6.up.railway.app:${port}`);
   (async () => {
-    await open(`http://localhost:${port}/auth/google`);
+    await open(`http://bot-production-7bb6.up.railway.app:${port}/auth/google`);
   })();
 });
 
