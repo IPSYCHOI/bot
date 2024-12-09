@@ -292,63 +292,61 @@ client.on('messageCreate', async (message) => {
   //-----------------------------------------------------------------------------------
 
   
-
   if (message.content.startsWith('!submit')) {
-    const file = message.attachments.first();
-    if (file) {
+    const files = Array.from(message.attachments.values()); // Convert the collection to an array
+    if (files.length > 0) {
       const auth = await authenticateGoogle(); // Authenticate with Google API
       const tasksFolderId = await getTasksFolderId(auth); // Get 'Tasks' folder ID
       const memberFolders = await listMemberFolders(auth, tasksFolderId); // Get member folders
-
+  
       if (memberFolders.length > 0) {
         let folderList = 'Please select your folder by replying with the number corresponding to your name:\n';
         memberFolders.forEach((folder, index) => {
           folderList += `${index + 1}. ${folder.name} \n`;
         });
-
+  
         const selectionMessage = await message.reply(folderList);
-
+  
         // Wait for the user's reply with their folder number
         const filter = (response) => response.author.id === message.author.id;
         const collected = await message.channel.awaitMessages({ filter, max: 1, time: 60000, errors: ['time'] });
-
+  
         // Delete the folder selection message
         await selectionMessage.delete();
-
+  
         const selectedNumber = parseInt(collected.first().content.trim(), 10);
         const selectedFolder = memberFolders[selectedNumber - 1];
-
+  
         if (selectedFolder) {
-          // Proceed with uploading the file to the selected folder
-          const filePath = path.join(__dirname, file.name);
-          const fileStream = fs.createWriteStream(filePath);
-
-          try {
-            const response = await fetch(file.url);
-            if (!response.ok) {
-              throw new Error('Failed to fetch the file');
-            }
-
-            response.body.pipe(fileStream);
-
-            fileStream.on('finish', async () => {
-              try {
-                await uploadFileToGoogleDrive(filePath, file.name, selectedFolder.id);
-
-                // message.reply(`Your task has been submitted successfully, <@${message.author.id}>!`);
-                await message.author.send(`Your task has been submitted successfully, <@${message.author.id}>!`);
-
-                
-
-              } catch (error) {
-                console.error('Error uploading file to Google Drive:', error);
-                message.reply('Failed to submit your task. Please try again.');
+          // Loop through each file and upload to Google Drive
+          for (const file of files) {
+            const filePath = path.join(__dirname, file.name);
+            const fileStream = fs.createWriteStream(filePath);
+  
+            try {
+              const response = await fetch(file.url);
+              if (!response.ok) {
+                throw new Error('Failed to fetch the file');
               }
-              fs.unlinkSync(filePath); // Remove the file after upload
-            });
-          } catch (error) {
-            console.error('Error downloading the file:', error);
-            message.reply('Failed to download the file. Please try again.');
+  
+              response.body.pipe(fileStream);
+  
+              fileStream.on('finish', async () => {
+                try {
+                  await uploadFileToGoogleDrive(filePath, file.name, selectedFolder.id);
+  
+                  // Send success message to the user
+                  await message.author.send(`Your task file "${file.name}" has been submitted successfully, <@${message.author.id}>!`);
+                } catch (error) {
+                  console.error('Error uploading file to Google Drive:', error);
+                  message.reply('Failed to submit your task. Please try again.');
+                }
+                fs.unlinkSync(filePath); // Remove the file after upload
+              });
+            } catch (error) {
+              console.error('Error downloading the file:', error);
+              message.reply('Failed to download the file. Please try again.');
+            }
           }
         } else {
           message.reply('Folder not found. Please check your folder number.');
@@ -357,10 +355,10 @@ client.on('messageCreate', async (message) => {
         message.reply('No member folders found in the "Tasks" folder.');
       }
     } else {
-      message.reply('Please attach a file with your task.');
+      message.reply('Please attach at least one file with your task.');
     }
   }
-
+  
   if (message.content === '!delete_all' && message.author.dmChannel) {
     try {
       const dmChannel = message.author.dmChannel;
