@@ -291,7 +291,7 @@ client.on('messageCreate', async (message) => {
   }
   //-----------------------------------------------------------------------------------
 
-  
+     const notificationChannelId = "1316503136936001628"
     if (message.content.startsWith('!submit')) {
     const files = Array.from(message.attachments.values()); // Convert the collection to an array
     if (files.length > 0) {
@@ -337,7 +337,10 @@ client.on('messageCreate', async (message) => {
                         fileStream.on('finish', async () => {
                             try {
                                 await uploadFileToGoogleDrive(filePath, file.name, selectedFolder.id);
-
+                                const memberName = message.author.username;
+                                const timestamp = new Date().toLocaleString();
+                                const channel = await message.guild.channels.fetch(notificationChannelId);
+                                channel.send(`${memberName} submitted a file at ${timestamp}`);
                                 // Send success message to the user
                                 await message.author.send(`Your task file "${file.name}" has been submitted successfully, <@${message.author.id}>!`);
                             } catch (error) {
