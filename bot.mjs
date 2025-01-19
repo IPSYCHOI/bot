@@ -117,6 +117,38 @@ async function authenticateGoogle() {
   }
   return oAuth2Client;
 }
+async function listFilesInFolder(auth, folderId) {
+  const drive = google.drive({ version: 'v3', auth });
+  const res = await drive.files.list({
+      q: `'${folderId}' in parents and mimeType != 'application/vnd.google-apps.folder'`,
+      fields: 'files(id, name)',
+  });
+  return res.data.files;
+}
+async function moveFilesToSubfolder(auth, fileIds, destinationFolderId) {
+  const drive = google.drive({ version: 'v3', auth });
+  for (const fileId of fileIds) {
+      await drive.files.update({
+          fileId: fileId,
+          addParents: destinationFolderId,
+          removeParents: (await drive.files.get({ fileId: fileId, fields: 'parents' })).data.parents.join(','),
+          fields: 'id, parents',
+      });
+  }
+}
+async function createSubfolder(auth, parentFolderId, folderName) {
+  const drive = google.drive({ version: 'v3', auth });
+  const fileMetadata = {
+      name: folderName,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [parentFolderId],
+  };
+  const res = await drive.files.create({
+      resource: fileMetadata,
+      fields: 'id',
+  });
+  return res.data.id;  // Return the ID of the new subfolder
+}
 
 // Express server handling Google OAuth redirect
 app.get('/auth/google', async (req, res) => {
@@ -387,6 +419,41 @@ client.on('messageCreate', async (message) => {
       message.reply("An error occurred while trying to delete the messages.");
     }
   }
+    if (message.content.startsWith('!organize')) {
+    // Check if the message author is the allowed user
+    if (message.author.id !== allowedUserId) {
+        return message.reply("You don't have permission to use this command.");
+    }
+
+    // Extract the subfolder name from the command
+    const subfolderName = message.content.split(' ')[1]; // e.g., "!organize task1" => "task1"
+    if (!subfolderName) {
+        return message.reply('Please specify a subfolder name. Usage: `!organize <subfolder-name>`');
+    }
+
+    try {
+        const auth = await authenticateGoogle();
+        const tasksFolderId = await getTasksFolderId(auth);
+        const memberFolders = await listMemberFolders(auth, tasksFolderId);
+
+        for (const memberFolder of memberFolders) {
+            // Create a new subfolder with the specified name
+            const subfolderId = await createSubfolder(auth, memberFolder.id, subfolderName);
+            
+            // List all files in the student's folder
+            const files = await listFilesInFolder(auth, memberFolder.id);
+            const fileIds = files.map(file => file.id);
+            
+            // Move all files into the new subfolder
+            await moveFilesToSubfolder(auth, fileIds, subfolderId);
+        }
+
+        message.reply(`Files have been organized into new subfolders named "${subfolderName}".`);
+    } catch (error) {
+        console.error('Error organizing files:', error);
+        message.reply('Failed to organize files. Please check the logs for details.');
+    }
+}
 });
 
 
