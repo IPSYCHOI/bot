@@ -454,6 +454,112 @@ client.on('messageCreate', async (message) => {
         message.reply('Failed to organize files. Please check the logs for details.');
     }
 }
+  if (message.content === "!listnames") {
+    try {
+      const response = await axios.get(SHEETDB_API_URL);
+      
+      cachedNames = response.data;
+
+      if (cachedNames.length === 0) {
+        message.reply("No names found in the database.");
+        return;
+      }
+
+      // Display names with their corresponding numbers
+      let replyMessage = "**List of Names:**\n";
+      cachedNames.forEach((entry, index) => {
+        replyMessage += `${index + 1}. ${entry.Names} - Points: ${entry.Points || 0}\n`;
+      });
+
+      message.reply(replyMessage );
+    } catch (error) {
+      console.error("Error fetching names:", error.response?.data || error.message);
+      message.reply("An error occurred while fetching the names.");
+    }
+  }
+
+  // Command to select a name and update points
+  if (message.content.startsWith("!select")) {
+    const args = message.content.split(" ");
+    if (args.length < 3) {
+      message.reply("Usage: `!select <number> <points>`");
+      return;
+    }
+
+    const selectedNumber = parseInt(args[1]);
+    const pointsToAdd = parseInt(args[2]);
+
+    if (isNaN(selectedNumber) || isNaN(pointsToAdd)) {
+      message.reply("Please provide valid numbers for both the selection and points.");
+      return;
+    }
+
+    if (selectedNumber < 1 || selectedNumber > cachedNames.length) {
+      message.reply("Invalid selection. Please choose a valid number from the list.");
+      return;
+    }
+
+    // Get the selected name
+    const selectedEntry = cachedNames[selectedNumber - 1];
+    const currentPoints = parseInt(selectedEntry.Points || 0);
+    const newPoints = currentPoints + pointsToAdd;
+    const condition = { Names: selectedEntry.Names };
+
+    try {
+      // Update the points for the selected name using the "Names" column
+      await axios.delete(`${SHEETDB_API_URL}`, {
+        data: {
+          column: 'Names',  // The column you're filtering by
+          value: selectedEntry.Names  // The value to match in that column
+        }
+      });
+
+      // Step 2: Insert the updated row with new points
+      const updateResponse = await axios.post(`${SHEETDB_API_URL}`, {
+        data: { Names: selectedEntry.Names, Points: newPoints }
+      });
+      
+
+      message.reply(
+        `Successfully updated points for '${selectedEntry.Names}' to ${newPoints}.`
+      );
+    } catch (error) {
+      console.error("Error updating points:", error.response?.data || error.message);
+      message.reply("An error occurred while updating the points.");
+    }
+  }
+
+  if (message.content === "!points") {
+    try {
+      const response = await axios.get(SHEETDB_API_URL);
+      
+      cachedNames = response.data;
+  
+      if (cachedNames.length === 0) {
+        message.author.send("No names found in the database.");
+        return;
+      }
+  
+      // Display names with their corresponding numbers
+      let replyMessage = "**List of Names:**\n";
+      cachedNames.forEach((entry, index) => {
+        replyMessage += ` ${entry.Names} - Points: ${entry.Points || 0}\n`;
+      });
+  
+      // Send the list of names and points in DM
+      message.author.send(replyMessage);
+  
+    } catch (error) {
+      console.error("Error fetching names:", error.response?.data || error.message);
+      message.author.send("An error occurred while fetching the names.");
+    }
+  }
+
+
+
+
+
+  
 });
 
 
