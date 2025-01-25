@@ -15,7 +15,8 @@ dotenv.config();
 // Paths setup
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
+const SHEETDB_API_URL = "https://sheetdb.io/api/v1/pszle45qy6kg6";
+let cachedNames = [];
 // Discord Bot setup
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
