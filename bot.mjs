@@ -7,7 +7,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import open from 'open';
-import fetch from 'node-fetch'; // Ensure you have 'node-fetch' installed for fetching files
+import fetch from 'node-fetch';
+import axios from 'axios';// Ensure you have 'node-fetch' installed for fetching files
 
 // Configure dotenv to load environment variables
 dotenv.config();
